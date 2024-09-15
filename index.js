@@ -1,7 +1,10 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const { Client, Collection, Events, GatewayIntentBits } = require('discord.js');
-const { token } = require('./config.json');
+const { Client, Collection, Events, GatewayIntentBits, REST, Routes } = require('discord.js');
+const { token, clientId, guildId } = require('./config.json');
+
+// RESTクライアントの作成
+const rest = new REST({ version: '10' }).setToken(token); // ここでrestを定義します
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
@@ -9,6 +12,8 @@ client.cooldowns = new Collection();
 client.commands = new Collection();
 const foldersPath = path.join(__dirname, 'commands');
 const commandFolders = fs.readdirSync(foldersPath);
+
+const commands = []; // commands配列を作成
 
 for (const folder of commandFolders) {
 	const commandsPath = path.join(foldersPath, folder);
@@ -18,39 +23,41 @@ for (const folder of commandFolders) {
 		const command = require(filePath);
 		if ('data' in command && 'execute' in command) {
 			client.commands.set(command.data.name, command);
+			commands.push(command.data.toJSON()); // commands配列にコマンドを追加
 		} else {
-			console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
+			console.log(`[警告] ${filePath} のコマンドに必要な "data" または "execute" プロパティがありません。`);
 		}
 	}
 }
 
+// コマンドをDiscordに登録
 (async () => {
 	try {
-		console.log(`Started refreshing ${commands.length} application (/) commands.`);
+		console.log(`現在 ${commands.length} 個のアプリケーション (/) コマンドをリフレッシュしています。`);
 
-		// The put method is used to fully refresh all commands in the guild with the current set
+		// putメソッドは、現在のコマンドセットでギルド内のすべてのコマンドを完全にリフレッシュするために使用されます
 		const data = await rest.put(
 			Routes.applicationGuildCommands(clientId, guildId),
 			{ body: commands },
 		);
 
-		console.log(`Successfully reloaded ${data.length} application (/) commands.`);
+		console.log(`成功しました。${data.length} 個のアプリケーション (/) コマンドがリロードされました。`);
 	} catch (error) {
-		// And of course, make sure you catch and log any errors!
+		// もちろん、エラーをキャッチしてログに記録することを忘れずに！
 		console.error(error);
 	}
 })();
 
 client.once(Events.ClientReady, readyClient => {
-	console.log(`Ready! Logged in as ${readyClient.user.tag}`);
+	console.log(`準備完了！${readyClient.user.tag} としてログインしました。`);
 });
 
 client.on(Events.InteractionCreate, async interaction => {
 	if (!interaction.isChatInputCommand()) return;
-	const command = client.commands.get(interaction.commandName);
 
+	const command = client.commands.get(interaction.commandName);
 	if (!command) {
-		console.error(`No command matching ${interaction.commandName} was found.`);
+		console.error(`${interaction.commandName} に対応するコマンドが見つかりませんでした。`);
 		return;
 	}
 
@@ -62,7 +69,7 @@ client.on(Events.InteractionCreate, async interaction => {
 
 	const now = Date.now();
 	const timestamps = cooldowns.get(command.data.name);
-	const defaultCooldownDuration = 3;
+	const defaultCooldownDuration = 3; // デフォルトのクールダウン時間を3秒に設定
 	const cooldownAmount = (command.cooldown ?? defaultCooldownDuration) * 1000;
 
 	if (timestamps.has(interaction.user.id)) {
@@ -70,7 +77,7 @@ client.on(Events.InteractionCreate, async interaction => {
 
 		if (now < expirationTime) {
 			const expiredTimestamp = Math.round(expirationTime / 1000);
-			return interaction.reply({ content: `Please wait, you are on a cooldown for \`${command.data.name}\`. You can use it again <t:${expiredTimestamp}:R>.`, ephemeral: true });
+			return interaction.reply({ content: `クールダウン中です。コマンド \`${command.data.name}\` を再び使用できるのは <t:${expiredTimestamp}:R> です。`, ephemeral: true });
 		}
 	}
 
@@ -82,9 +89,9 @@ client.on(Events.InteractionCreate, async interaction => {
 	} catch (error) {
 		console.error(error);
 		if (interaction.replied || interaction.deferred) {
-			await interaction.followUp({ content: 'There was an error while executing this command!', ephemeral: true });
+			await interaction.followUp({ content: 'このコマンドの実行中にエラーが発生しました。', ephemeral: true });
 		} else {
-			await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+			await interaction.reply({ content: 'このコマンドの実行中にエラーが発生しました。', ephemeral: true });
 		}
 	}
 });
