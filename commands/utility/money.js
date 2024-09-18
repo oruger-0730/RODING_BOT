@@ -172,8 +172,8 @@ const moneySlut = async (interaction) => {
   await interaction.reply({ embeds: [embed] });
 };
 
-async execute(interaction) {
-  const bet = interaction.options.getString('bet');
+const moneyBlackjack = async (interaction) => {
+  const bet = interaction.options.getInteger('bet');
   
   // 最初にプレイヤーとディーラーのカードを2枚ずつ引く
   let playerHand = [drawCard(), drawCard()];
@@ -250,7 +250,6 @@ async execute(interaction) {
       interaction.editReply({ content: 'タイムアウトしました。', components: [] });
     }
   });
-}
 };
 
 // メインコマンド
@@ -276,7 +275,15 @@ module.exports = {
         .setDescription('指定した人のお金とアイテムリストを表示します')
         .addUserOption(option =>
           option.setName('user')
-            .setDescription('ステータスを確認するユーザーを指定します'))),
+            .setDescription('ステータスを確認するユーザーを指定します')))
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('blackjack')
+        .setDescription('ブラックジャックをします。')
+        .addIntegerOption(option =>
+          option.setName('bet')
+            .setDescription('掛ける金額を指定してください。')
+            .setRequired(true))),
 
   async execute(interaction) {
     const subcommand = interaction.options.getSubcommand();
@@ -289,6 +296,8 @@ module.exports = {
       await moneySlut(interaction);
     } else if (subcommand === 'item') {
       await moneyItem(interaction);
+    } else if (subcommand === 'blackjack') {
+      await moneyBlackjack(interaction);
     }
   }
 };
