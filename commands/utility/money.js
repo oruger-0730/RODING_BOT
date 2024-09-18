@@ -63,6 +63,14 @@ const setCooldown = (userId, command) => {
   saveCooldowns(cooldowns);
 };
 
+const drawCard = () => {
+  const cards = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+  const suits = ['♠️', '♥️', '♦️', '♣️'];
+  const card = cards[Math.floor(Math.random() * cards.length)];
+  const suit = suits[Math.floor(Math.random() * suits.length)];
+  return `${card} ${suit}`;
+};
+
 // /money work コマンド
 const moneyWork = async (interaction) => {
   const userId = interaction.user.id;
@@ -162,6 +170,87 @@ const moneySlut = async (interaction) => {
     .setTimestamp();
 
   await interaction.reply({ embeds: [embed] });
+};
+
+async execute(interaction) {
+  const bet = interaction.options.getString('bet');
+  
+  // 最初にプレイヤーとディーラーのカードを2枚ずつ引く
+  let playerHand = [drawCard(), drawCard()];
+  let dealerHand = [drawCard(), '🂠']; // ディーラーの2枚目は伏せられる
+
+  // カードの値の計算（ここはシンプルな例で、詳細なブラックジャックのロジックは追加可能）
+  let playerValue = 20; // 例として
+  let dealerValue = 5; // 例として
+
+  const embed = new EmbedBuilder()
+    .setColor('Blue')
+    .setTitle('ブラックジャック')
+    .addFields(
+      { name: 'Your hand', value: `${playerHand.join(', ')}`, inline: true },
+      { name: 'Dealer Hand', value: `${dealerHand.join(', ')}`, inline: true },
+      { name: 'Value', value: `Player: ${playerValue}\nDealer: ${dealerValue}`, inline: false },
+    )
+    .setFooter({ text: 'Hitでカードを追加、Standで終了します' });
+  
+  const row = new ActionRowBuilder()
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId('hit')
+        .setLabel('Hit')
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId('stand')
+        .setLabel('Stand')
+        .setStyle(ButtonStyle.Success)
+    );
+
+  await interaction.reply({ embeds: [embed], components: [row] });
+
+  // ボタンのインタラクション処理
+  const filter = i => i.user.id === interaction.user.id;
+  const collector = interaction.channel.createMessageComponentCollector({ filter, time: 30000 });
+
+  collector.on('collect', async i => {
+    if (i.customId === 'hit') {
+      // プレイヤーが「Hit」を選択
+      const newCard = drawCard();
+      playerHand.push(newCard);
+      playerValue += 10; // 例として10を追加（実際の値計算は別途実装）
+
+      // ゲームの続行
+      const updatedEmbed = EmbedBuilder.from(embed)
+        .setFields(
+          { name: 'Your hand', value: `${playerHand.join(', ')}`, inline: true },
+          { name: 'Dealer Hand', value: `${dealerHand.join(', ')}`, inline: true },
+          { name: 'Value', value: `Player: ${playerValue}\nDealer: ${dealerValue}`, inline: false },
+        );
+
+      await i.update({ embeds: [updatedEmbed], components: [row] });
+    } else if (i.customId === 'stand') {
+      // プレイヤーが「Stand」を選択
+      dealerHand[1] = drawCard(); // ディーラーの伏せたカードを公開
+      dealerValue += 10; // 例として
+
+      const finalEmbed = EmbedBuilder.from(embed)
+        .setFields(
+          { name: 'Your hand', value: `${playerHand.join(', ')}`, inline: true },
+          { name: 'Dealer Hand', value: `${dealerHand.join(', ')}`, inline: true },
+          { name: 'Value', value: `Player: ${playerValue}\nDealer: ${dealerValue}`, inline: false },
+        )
+        .setFooter({ text: 'ゲーム終了' });
+
+      await i.update({ embeds: [finalEmbed], components: [] });
+      collector.stop();
+    }
+  });
+
+  collector.on('end', collected => {
+    if (collected.size === 0) {
+      interaction.editReply({ content: 'タイムアウトしました。', components: [] });
+    }
+  });
+}
 };
 
 // メインコマンド
