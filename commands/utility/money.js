@@ -8,7 +8,7 @@ const itemsFilePath = path.join(__dirname, '/userItems.json');
 const cooldownFilePath = path.join(__dirname, '/cooldowns.json');
 
 // クールダウンの時間（30秒）
-const cooldownTime = 30 * 1000; // 30秒（ミリ秒）
+const cooldownTime = 120 * 1000; // 30秒（ミリ秒）
 
 // コインデータを読み込む関数
 const readData = () => {
@@ -61,14 +61,6 @@ const setCooldown = (userId, command) => {
   }
   cooldowns[userId][command] = Date.now();
   saveCooldowns(cooldowns);
-};
-
-const drawCard = () => {
-  const cards = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-  const suits = ['♠️', '♥️', '♦️', '♣️'];
-  const card = cards[Math.floor(Math.random() * cards.length)];
-  const suit = suits[Math.floor(Math.random() * suits.length)];
-  return `${card} ${suit}`;
 };
 
 // /money work コマンド
@@ -172,87 +164,6 @@ const moneySlut = async (interaction) => {
   await interaction.reply({ embeds: [embed] });
 };
 
-const moneyBlackjack = async (interaction) => {
-  const bet = interaction.options.getInteger('bet');
-  
-  // 最初にプレイヤーとディーラーのカードを2枚ずつ引く
-  let playerHand = [drawCard(), drawCard()];
-  let dealerHand = [drawCard(), '🂠']; // ディーラーの2枚目は伏せられる
-
-  // カードの値の計算（ここはシンプルな例で、詳細なブラックジャックのロジックは追加可能）
-  let playerValue = 20; // 例として
-  let dealerValue = 5; // 例として
-
-  const embed = new EmbedBuilder()
-    .setColor('Blue')
-    .setTitle('ブラックジャック')
-    .addFields(
-      { name: 'Your hand', value: `${playerHand.join(', ')}`, inline: true },
-      { name: 'Dealer Hand', value: `${dealerHand.join(', ')}`, inline: true },
-      { name: 'Value', value: `Player: ${playerValue}\nDealer: ${dealerValue}`, inline: false },
-    )
-    .setFooter({ text: 'Hitでカードを追加、Standで終了します' });
-  
-  const row = new ActionRowBuilder()
-    .addComponents(
-      new ButtonBuilder()
-        .setCustomId('hit')
-        .setLabel('Hit')
-        .setStyle(ButtonStyle.Primary),
-      new ButtonBuilder()
-        .setCustomId('stand')
-        .setLabel('Stand')
-        .setStyle(ButtonStyle.Success)
-    );
-
-  await interaction.reply({ embeds: [embed], components: [row] });
-
-  // ボタンのインタラクション処理
-  const filter = i => i.user.id === interaction.user.id;
-  const collector = interaction.channel.createMessageComponentCollector({ filter, time: 30000 });
-
-  collector.on('collect', async i => {
-    if (i.customId === 'hit') {
-      // プレイヤーが「Hit」を選択
-      const newCard = drawCard();
-      playerHand.push(newCard);
-      playerValue += 10; // 例として10を追加（実際の値計算は別途実装）
-
-      // ゲームの続行
-      const updatedEmbed = EmbedBuilder.from(embed)
-        .setFields(
-          { name: 'Your hand', value: `${playerHand.join(', ')}`, inline: true },
-          { name: 'Dealer Hand', value: `${dealerHand.join(', ')}`, inline: true },
-          { name: 'Value', value: `Player: ${playerValue}\nDealer: ${dealerValue}`, inline: false },
-        );
-
-      await i.update({ embeds: [updatedEmbed], components: [row] });
-    } else if (i.customId === 'stand') {
-      // プレイヤーが「Stand」を選択
-      dealerHand[1] = drawCard(); // ディーラーの伏せたカードを公開
-      dealerValue += 10; // 例として
-
-      const finalEmbed = EmbedBuilder.from(embed)
-        .setFields(
-          { name: 'Your hand', value: `${playerHand.join(', ')}`, inline: true },
-          { name: 'Dealer Hand', value: `${dealerHand.join(', ')}`, inline: true },
-          { name: 'Value', value: `Player: ${playerValue}\nDealer: ${dealerValue}`, inline: false },
-        )
-        .setFooter({ text: 'ゲーム終了' });
-
-      await i.update({ embeds: [finalEmbed], components: [] });
-      collector.stop();
-    }
-  });
-
-  collector.on('end', collected => {
-    if (collected.size === 0) {
-      interaction.editReply({ content: 'タイムアウトしました。', components: [] });
-    }
-  });
-};
-
-// メインコマンド
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('money')
@@ -275,15 +186,7 @@ module.exports = {
         .setDescription('指定した人のお金とアイテムリストを表示します')
         .addUserOption(option =>
           option.setName('user')
-            .setDescription('ステータスを確認するユーザーを指定します')))
-    .addSubcommand(subcommand =>
-      subcommand
-        .setName('blackjack')
-        .setDescription('ブラックジャックをします。')
-        .addIntegerOption(option =>
-          option.setName('bet')
-            .setDescription('掛ける金額を指定してください。')
-            .setRequired(true))),
+            .setDescription('ステータスを確認するユーザーを指定します'))),
 
   async execute(interaction) {
     const subcommand = interaction.options.getSubcommand();
@@ -296,8 +199,6 @@ module.exports = {
       await moneySlut(interaction);
     } else if (subcommand === 'item') {
       await moneyItem(interaction);
-    } else if (subcommand === 'blackjack') {
-      await moneyBlackjack(interaction);
     }
   }
 };
